@@ -28,25 +28,24 @@ NpcPositions := class<final><persistable>:
 Main_Device<public> := class(creative_device):
     @editable SpawnerList: []NPCWithCritPoints = array{}
     @editable LinearRaycastAsset: creative_prop_asset = DefaultCreativePropAsset
-    @editable DebugAsset : creative_prop_asset = DefaultCreativePropAsset
     @editable LeftClick: input_trigger_device = input_trigger_device{}
+    @editable ItemGranter: item_granter_device = item_granter_device{}
+
     var AliveNpcs : [fort_character]string = map{}
 
     var SelectedNpc:?fort_character = false
 
-    var MaybeActiveRP: ?RaycastProp = false
+    #var MaybeActiveRP: ?RaycastProp = false
 
     # Runs when the device is started in a running game
     OnBegin<override>()<suspends>:void=
         LeftClick.PressedEvent.Subscribe(HandleLeftClick)
         for(Player:GetPlayspace().GetPlayers()):
+            ItemGranter.GrantItem(Player)
             if(set TempPlayerPersistance[Player] = NpcPositions{CommandMap:=map{}}){}
             if(FC:=Player.GetFortCharacter[]):
                 FC.Hide()
                 RP := SpawnRaycastProp(LinearRaycastAsset, FC.GetTransform().Translation)
-                set MaybeActiveRP = RP
-                if(ARP:= RP?):
-                    spawn. MoveRaycastAround(ARP, Player)
 
         for(SpawnerItem:SpawnerList):
             if(Player:=GetPlayspace().GetPlayers()[SpawnerItem.PlayerIndex]):
@@ -54,13 +53,18 @@ Main_Device<public> := class(creative_device):
                 SpawnerItem.Spawner.EliminatedEvent.Subscribe(NPC_Despawn{Device:=Self, Name:=SpawnerItem.Name}.HandlerFunction)
 
 
-    MoveRaycastAround(RP:RaycastProp, Player:agent)<suspends>:void=
-        if(FC:= Player.GetFortCharacter[]):   
-            Debug:= SpawnTarget(vector3{X:=10.0, Y:=10.0, Z:=10.0}, DebugAsset)
-            loop:
-                V:=CalculatePoint(Player, 250.0, "Forward")
-                RP.Parent.MoveTo(V, FC.GetViewRotation(), 0.1)
-                spawn. Debug.MoveTo(RP.HitLocationProp.GetTransform().Translation,IdentityRotation(),0.1)
+    # MoveRaycastAround(RP:RaycastProp, Player:agent)<suspends>:void=
+    #     if(FC:= Player.GetFortCharacter[]):   
+    #         loop:
+    #             Sleep(0.1)
+    #             V:=CalculatePoint(Player, 350.0, "Forward")
+    #             Print("Moving to: {V.X}, {V.Y}, {V.Z}")
+    #             if(V.IsFinite[]):
+    #                 Degrees:=FC.GetViewRotation().GetYawPitchRollDegrees()
+    #                 if(Yaw:=Degrees[0], Pitch:=Degrees[1], Roll:=Degrees[2]):
+    #                     Print("Yaw: {Yaw}, Pitch: {Pitch}, Roll: {Roll}")
+    #                     NewRotation:= MakeRotationFromYawPitchRollDegrees(Yaw, Pitch, 0.0)
+    #                     spawn. RP.Parent.MoveTo(V, NewRotation, 0.1)
                 
 
     AddNPC(NPC:agent, Player:player, LocationToGo:vector3)<suspends>:void=
@@ -87,25 +91,34 @@ Main_Device<public> := class(creative_device):
                     set AliveNpcs = NewMap
 
     HandleLeftClick(Agent:agent):void=
-        if(ActiveRP:=MaybeActiveRP?):
-            ActiveLocation := ActiveRP.HitLocationProp.GetTransform().Translation
+        spawn.  HandleLeftClickAsync(Agent)
 
-            if(ASelectedNPC:=SelectedNpc? ):
-                Print("selected npc")
-                CommandString := "GoTo:{ActiveLocation.X},{ActiveLocation.Y},{ActiveLocation.Z}"
-                if(Player:= player[Agent]):
-                    if(Positions := TempPlayerPersistance[Player].CommandMap):
-                        var NewPositions : [string]NPC_Commands = Positions
-                        if(set NewPositions[AliveNpcs[ASelectedNPC]] = NPC_Commands{Command:=CommandString}){}
-                        if(set TempPlayerPersistance[Player] = NpcPositions{CommandMap:=NewPositions}){}
-                        set SelectedNpc = false
-            else:
-                Print("no selected npc")
-                var PossibleNPCs :[]fort_character = array{}
-                for(FC->Key: AliveNpcs):
-                    set PossibleNPCs+= array{FC}
-                MaybeFoundNpc := ActiveLocation.GetClosestFCInRange(PossibleNPCs, ?MaxRange:= 300.0)(0)
-                set SelectedNpc = MaybeFoundNpc
+    HandleLeftClickAsync(Agent:agent)<suspends>:void=
+        if(PlayerFC:= Agent.GetFortCharacter[]):
+            MaybeActiveRP := SpawnRaycastProp(LinearRaycastAsset, PlayerFC.GetTransform().Translation)
+
+            if(ActiveRP:=MaybeActiveRP?):
+                if(ActiveRP.Parent.TeleportTo[CalculatePoint(Agent, 350.0, "Forward"), PlayerFC.GetViewRotation()]){}
+                Sleep(0.01)
+                ActiveLocation := ActiveRP.HitLocationProp.GetTransform().Translation
+
+                if(ASelectedNPC:=SelectedNpc? ):
+                    Print("selected npc")
+                    CommandString := "GoTo:{ActiveLocation.X},{ActiveLocation.Y},{ActiveLocation.Z}"
+                    if(Player:= player[Agent]):
+                        if(Positions := TempPlayerPersistance[Player].CommandMap):
+                            var NewPositions : [string]NPC_Commands = Positions
+                            if(set NewPositions[AliveNpcs[ASelectedNPC]] = NPC_Commands{Command:=CommandString}){}
+                            if(set TempPlayerPersistance[Player] = NpcPositions{CommandMap:=NewPositions}){}
+                            set SelectedNpc = false
+                else:
+                    Print("no selected npc")
+                    var PossibleNPCs :[]fort_character = array{}
+                    for(FC->Key: AliveNpcs):
+                        set PossibleNPCs+= array{FC}
+                    MaybeFoundNpc := ActiveLocation.GetClosestFCInRange(PossibleNPCs, ?MaxRange:= 300.0)(0)
+                    set SelectedNpc = MaybeFoundNpc
+                ActiveRP.GracefullDispose()
                 
                 
 

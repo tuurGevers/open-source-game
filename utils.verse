@@ -626,13 +626,15 @@ ClearHud(Player:player):void=
     if(S = ""):
         return 0.0
 
-    if(S[0] = "-"):
+    if(S[0] = '-'):
+        Print("negative")
         set Negative = true
         set StartIndex=1
 
     for(I:=StartIndex..S.Length-1):
         if(Char := S[I]):
-            if(Char = "." or Char.ToFloat() =-1.0):
+            if(Char = '.' or Char.ToFloat() =-1.0):
+                Print("decimal")
                 set DecimalFound = true
             else:
                 if(DecimalFound = true):

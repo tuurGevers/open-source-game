@@ -61,6 +61,7 @@ new_npc_behavior_basic<public> := class(npc_behavior):
                     Y:= Args[1].ToFloat(),
                     Z:= Args[2].ToFloat()
                 ):
+                    Print("{X},{Y},{Z}")
                     Res:= race:
                         NPC.NavigateToLocation(vector3{X:=X,Y:=Y,Z:=Z}, 10.0)
                         ShouldCancelCommand(CommandIndex)
